@@ -1,0 +1,32 @@
+Note: Everything in this directory is writable for members of the PAS1405
+group. This might make it easier to run scripts in here.
+
+* Example Usage
+** TODO fit-scaling-params.py
+** example-figure-code.py
+Note: The scaling parameters are created by the fit-scaling-params.py
+script. There is also a fit-scaling-params.sh slurm job in this directory which
+runs that script.
+
+Note: This script makes a lot of assumptions and is likely to fail.
+
+Note: This script caches results in a directory called "saved-signals" which is
+located next to the script. Make sure that directory exists and is
+writable. Every time the program is run, it'll attempt to retrieve results from
+the last time it was run with the same arguments. You can change the output name
+without affecting the caching mechanism. You can modify the script without
+affecting the caching mechanism.
+
+#+begin_src shell
+  COMMON_DATA_DIR="/users/PAS1405/tassosm/Desktop/common-data"
+
+  python ./example-figure-code.py \
+         --reference "/fs/project/PAS1405/General/HIV_RNA_modification_dataset/RNA_section__454_9627.fasta" \
+         --control-fast5-dir "$COMMON_DATA_DIR/guppy_ivt/workspace" \
+         --control-scaling "./scaling/ivt_scaling.txt" \
+         --sample-fast5-dir "$COMMON_DATA_DIR/guppy_vir/workspace" \
+         --sample-scaling "./scaling/vir_scaling.txt" \
+         --target-position "8079" \
+         --squiggle-width "20" \
+         -o "./squiggle-figure.png"
+#+end_src
