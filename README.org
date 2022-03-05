@@ -18,15 +18,17 @@ without affecting the caching mechanism. You can modify the script without
 affecting the caching mechanism.
 
 #+begin_src shell
-  COMMON_DATA_DIR="/users/PAS1405/tassosm/Desktop/common-data"
+COMMON_DATA_DIR="/users/PAS1405/tassosm/Desktop/common-data"
 
-  python ./example-figure-code.py \
-         --reference "/fs/project/PAS1405/General/HIV_RNA_modification_dataset/RNA_section__454_9627.fasta" \
-         --control-fast5-dir "$COMMON_DATA_DIR/guppy_ivt/workspace" \
-         --control-scaling "./scaling/ivt_scaling.txt" \
-         --sample-fast5-dir "$COMMON_DATA_DIR/guppy_vir/workspace" \
-         --sample-scaling "./scaling/vir_scaling.txt" \
-         --target-position "8079" \
-         --squiggle-width "20" \
-         -o "./squiggle-figure.png"
+python ./example-figure-code.py \
+       --reference "/fs/project/PAS1405/General/HIV_RNA_modification_dataset/RNA_section__454_9627.fasta" \
+       --control-fast5-dir "$COMMON_DATA_DIR/guppy_ivt/workspace" \
+       --control-scaling "./scaling/ivt_scaling.txt" \
+       --sample-fast5-dir "$COMMON_DATA_DIR/guppy_vir/workspace" \
+       --sample-scaling "./scaling/vir_scaling.txt" \
+       --target-position "8079" \
+       --start-pos "8069" \
+       --end-pos "8089" \
+       -n \
+       -o "./squiggle-figure.png"
 #+end_src

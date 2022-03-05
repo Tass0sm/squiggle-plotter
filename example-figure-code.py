@@ -64,13 +64,21 @@ parser.add_argument('--target-position',
                     type=int,
                     help='The target position around which to center the output plot.')
 
-parser.add_argument('--squiggle-width',
+parser.add_argument('--start-pos',
                     type=int,
-                    help='The number of bases shown in the plot surrounding the target position.')
+                    help='The start position for the plot window surrounding the target position.')
+
+parser.add_argument('--end-pos',
+                    type=int,
+                    help='The end position for the plot window surrounding the target position.')
 
 parser.add_argument('--output-file', '-o',
                     type=str,
                     help='The name of the output file (this can overwrite files).')
+
+parser.add_argument('--dry-run', '-n',
+                    const=True, default=False, action='store_const',
+                    help='Skip any significant computation and figure creation. Useful for testing arguments.')
 
 args = parser.parse_args()
 print(args.output_file)
@@ -103,7 +111,13 @@ scaling_ivt = pd.read_csv(scaling_ivt_path, sep='\t', names=['read_id', 'scale',
 scaling_vir = pd.read_csv(scaling_vir_path, sep='\t', names=['read_id', 'scale', 'shift']).set_index('read_id')
 scaling = pd.concat([scaling_ivt, scaling_vir])
 
-RESQUIGGLE_WIDTH = args.squiggle_width
+RESQUIGGLE_WIDTH = args.end_pos - args.start_pos
+
+if args.end_pos <= args.start_pos:
+    sys.exit("End position must be greater than start position.")
+
+if args.target_position <= args.start_pos or args.end_pos <= args.target_position:
+    sys.exit("Start position must be less than target position and end position must be greater than target position.")
 
 def load_fast5_alignment(filename, start, end, corrected_group):
     read_id = filename.split('/')[-1].split('.')[0]
@@ -164,8 +178,8 @@ vir_fast5_map = {f.split('/')[-1].split('.')[0]: f for f in glob(os.path.join(vi
 # Edit for candidate positions.
 # Candidate positions: 8079, 8975, 8989
 TARGET_SITE = args.target_position
-LEFT_END = TARGET_SITE - (args.squiggle_width // 2)
-RIGHT_END = TARGET_SITE + (args.squiggle_width // 2)
+LEFT_END = args.start_pos
+RIGHT_END = args.end_pos
 
 target_read_ids = list(vir_fast5_map)
 random.shuffle(target_read_ids)
@@ -223,7 +237,7 @@ def compute_xy_memoized(control_read_ids, target_read_ids):
     """
     global ctlres_x, ctlres_y, virres_x, virres_y
 
-    total_args = args.reference + args.control_fast5_dir + args.control_scaling + args.sample_fast5_dir + args.sample_scaling + str(args.target_position) + str(args.squiggle_width)
+    total_args = args.reference + args.control_fast5_dir + args.control_scaling + args.sample_fast5_dir + args.sample_scaling + str(args.target_position) + str(args.start_pos) + str(args.end_pos)
     total_hash_bytes = hashlib.sha224(bytes(total_args, "utf-8")).digest()
     total_hash_name = base64.b64encode(total_hash_bytes).decode('utf-8')
     signal_pickle_name = f"./saved-signals/{total_hash_name}-signals.pickle"
@@ -234,43 +248,48 @@ def compute_xy_memoized(control_read_ids, target_read_ids):
         compute_xy(control_read_ids, target_read_ids)
         pickle.dump([ctlres_x, ctlres_y, virres_x, virres_y], open(signal_pickle_name, 'wb'))
 
-compute_xy_memoized(control_read_ids, target_read_ids)
+if not args.dry_run:
+    compute_xy_memoized(control_read_ids, target_read_ids)
 
 ###############################################################################
 #                                    FIGURE                                   #
 ###############################################################################
 
-XTICKS = np.arange(LEFT_END-1, RIGHT_END+1, 5)
+def create_figure():
+    XTICKS = np.arange(LEFT_END-1, RIGHT_END+1, 5)
 
-fig, ax = plt.subplots(1, 1, figsize=(6.74, 3))
+    fig, ax = plt.subplots(1, 1, figsize=(6.74, 3))
 
-for i in range(35):
-    if i == 0:
-        ctlkwds = {'label': 'IVT'}; virkwds = {'label': 'Viral sgRNA S'}
-    else:
-        ctlkwds = virkwds = {}
-    ax.plot(ctlres_x[i], ctlres_y[i], c='#000000', lw=.4, alpha=.4, zorder=3, **ctlkwds)
-    ax.plot(virres_x[i], virres_y[i], c='#02a01e', lw=.4, alpha=.6, zorder=3, **virkwds)
+    for i in range(35):
+        if i == 0:
+            ctlkwds = {'label': 'IVT'}; virkwds = {'label': 'Viral sgRNA S'}
+        else:
+            ctlkwds = virkwds = {}
+        ax.plot(ctlres_x[i], ctlres_y[i], c='#000000', lw=.4, alpha=.4, zorder=3, **ctlkwds)
+        ax.plot(virres_x[i], virres_y[i], c='#02a01e', lw=.4, alpha=.6, zorder=3, **virkwds)
 
-for p in np.arange(LEFT_END, RIGHT_END):
-    ax.axvline(p, c='black', alpha=.4, lw=.5, zorder=1)
-    ax.annotate(covseq[p], (p + .5, 145), zorder=4, ha='center', va='top')
+    for p in np.arange(LEFT_END, RIGHT_END):
+        ax.axvline(p, c='black', alpha=.4, lw=.5, zorder=1)
+        ax.annotate(covseq[p], (p + .5, 145), zorder=4, ha='center', va='top')
 
-for sp in 'top right bottom'.split():
-    ax.spines[sp].set_visible(False)
+    for sp in 'top right bottom'.split():
+        ax.spines[sp].set_visible(False)
 
-ax.set_xticks(XTICKS + .5)
-ax.set_xticklabels(XTICKS + 1)
-ax.xaxis.tick_top()
-ax.set_ylabel('Normalized current (pA)')
-ax.spines['left'].set_position(('outward', 5))
-#plt.setp(ax.get_xticklines(), visible=False)
+    ax.set_xticks(XTICKS + .5)
+    ax.set_xticklabels(XTICKS + 1)
+    ax.xaxis.tick_top()
+    ax.set_ylabel('Normalized current (pA)')
+    ax.spines['left'].set_position(('outward', 5))
+    #plt.setp(ax.get_xticklines(), visible=False)
 
-ax.set_ylim(75, 145)
-#ax.legend(fontsize=10, loc='upper right')
-ax.set_xlim(LEFT_END, RIGHT_END)
-ax.grid(alpha=.2)
-ax.spines['top'].set_position(('outward', 5))
+    ax.set_ylim(75, 145)
+    #ax.legend(fontsize=10, loc='upper right')
+    ax.set_xlim(LEFT_END, RIGHT_END)
+    ax.grid(alpha=.2)
+    ax.spines['top'].set_position(('outward', 5))
 
-plt.tight_layout()
-plt.savefig(args.output_file)
+    plt.tight_layout()
+    plt.savefig(args.output_file)
+
+if not args.dry_run:
+    create_figure()
